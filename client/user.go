@@ -18,15 +18,46 @@ type User struct {
 
 func PopulateInformation(username *User) {
 
+	checkUser := getUserInfo(username)
+	if !checkUser{
+		return
+	}
 	accessKey(username)
 	certificate(username)
 	profile(username)
 	mfa(username)
-	policies(username)
 	group(username)
+	policies(username)
 	if !dryrun{
 		removeUser(username)
 	}
+}
+
+func getUserInfo(user *User) bool{
+	log.Debugf("Checking if %s exists",user.Name)
+	results, err := svc.GetUser(&iam.GetUserInput{
+		UserName: &user.Name,
+	})
+	log.Debugf("User: %s API: %s",user.Name,results)
+	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok {
+			if aerr.Code() == iam.ErrCodeNoSuchEntityException {
+				log.Infof("Unable to find User: %s",user.Name)
+				log.Debugf("User: %s, API:%s",user.Name,results)
+				return false
+			}
+		}
+		log.Errorf("User: %s MSG:%s",user.Name,err)
+		return false
+	}else{
+
+		if *results.User.UserName == user.Name {
+			return true
+		}
+
+	}
+
+	return false
 }
 
 func accessKey(user *User) {
