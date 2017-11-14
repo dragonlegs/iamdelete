@@ -11,9 +11,10 @@ type User struct {
 	Certs    []string
 	Password bool
 	MFA      [1]string
-	//VMFA []string
 	Policies []string
 	Groups   []string
+	CodeCommitSSH	 []string
+	GitCreds  []string
 }
 
 func PopulateInformation(username *User) {
@@ -28,6 +29,9 @@ func PopulateInformation(username *User) {
 	mfa(username)
 	group(username)
 	policies(username)
+	if ccommit{
+		codecommit(username)
+	}
 	if !dryrun{
 		removeUser(username)
 	}

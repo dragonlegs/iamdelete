@@ -14,6 +14,8 @@ var sess *session.Session
 var svc *iam.IAM
 var dryrun bool
 var UserList []*User
+var ccommit bool
+
 
 func getUser(wg *sync.WaitGroup,username string,number int){
 	defer wg.Done()
@@ -25,10 +27,11 @@ func getUser(wg *sync.WaitGroup,username string,number int){
 
 }
 
-func CheckingThis(profileName string, userList []string ,runIt bool)  {
+func CheckingThis(profileName string, userList []string ,runIt bool,codeCommit bool)  {
 	var wg sync.WaitGroup
 	//log.Debug("Attempting to Use AccessKey and Secret key Values")
 	dryrun = runIt
+	ccommit = codeCommit
 	if profileName != "" {
 		sess = session.Must(session.NewSessionWithOptions(session.Options{
 			Profile: profileName,

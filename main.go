@@ -42,6 +42,7 @@ func main(){
 	profileName := flag.String("profile","","AWS Profile to Use")
 	dryrun := flag.Bool("dryrun",false,"Prints out Items to be deleted and does not delete them")
 	logLevel := flag.Bool("d",false,"\n    	Enable Debug Logging")
+	code := flag.Bool("code",false,"Check/Remove CodeCommit Keys Attached to IAM User")
 	flag.Usage = helpmsg
 	flag.Parse()
 	setuplogging(*logLevel)
@@ -61,7 +62,7 @@ func main(){
 		//client.CheckingThis(*accesskey,*secretkey)
 	}
 
-	client.CheckingThis(*profileName,userList,*dryrun)
+	client.CheckingThis(*profileName,userList,*dryrun,*code)
 
 
 
