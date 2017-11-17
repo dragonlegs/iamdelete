@@ -4,38 +4,74 @@ import "github.com/aws/aws-sdk-go/service/iam"
 
 func codecommit(user *User){
 
-	codeCommitKeys(user)
+	codecommitkeys(user)
+	gitcreds(user)
 
 
 }
 
-func codeCommitKeys(user *User){
+func codecommitkeys(user *User){
 
-	log.Info("User: %s Checking Code Commit keys")
+	//log.Info("User: %s Checking Code Commit keys",user.Name)
 	result , err := svc.ListSSHPublicKeys(&iam.ListSSHPublicKeysInput{
 		UserName: &user.Name,
 	})
-	log.Debugf("User: %s ListSSH Keys API: %s",user.Name,result)
+	log.Debugf("ListSSHPublicKeys User: %s ListSSH Keys API: %s",user.Name,result)
 	if err != nil{
-		log.Errorf("User:%s Error: %s ",user.Name,result)
+		log.Errorf("ListSSHPublicKeys User: %s MSG: %s ",user.Name,result)
 	}else{
 		user.CodeCommitSSH = make([]string,len(result.SSHPublicKeys))
 		for i,k := range result.SSHPublicKeys {
 			user.CodeCommitSSH[i] = *k.SSHPublicKeyId
-			log.Infof("User: %s SSH Keys CodeCommit: %s ", user.Name, *k.SSHPublicKeyId )
+			log.Infof("ListSSHPublicKeys User: %s SSHPublicKeys : %s ", user.Name, *k.SSHPublicKeyId )
 			if !dryrun{
-				result ,err := svc.DeleteSSHPublicKey(&iam.DeleteSSHPublicKeyInput{
+				results ,err := svc.DeleteSSHPublicKey(&iam.DeleteSSHPublicKeyInput{
 					UserName: &user.Name,
 					SSHPublicKeyId: &user.CodeCommitSSH[i],
 				})
-				log.Debugf("User: %s Delete SSH Keys CodeCommit: %s API: %s",user.Name,user.CodeCommitSSH[i],result)
+				log.Debugf("DeleteSSHPublicKey User: %s API: %s",user.Name,user.CodeCommitSSH[i],results)
 				if err != nil{
-					log.Errorf("User:%s MSG: %s",user.Name,err)
+					log.Errorf("DeleteSSHPublicKey User:%s MSG: %s",user.Name,err)
 				}else{
-					log.Infof("User: %s Removed SSH: %s ",user.Name,user.CodeCommitSSH[i])
+					log.Infof("DeleteSSHPublicKey User: %s SSHPublicKeys: %s ",user.Name,user.CodeCommitSSH[i])
 				}
 			}else{
-				log.Infof("user: %s Removed SSH: %s (Removed)",user.Name,user.CodeCommitSSH[i])
+				log.Infof("(DRYRUN) DeleteSSHPublicKey User: %s SSH: %s (DRYRUN)",user.Name,user.CodeCommitSSH[i])
+			}
+		}
+	}
+
+}
+
+
+func gitcreds(user *User){
+
+	//log.Infof("User: %s Checking Git Creds for AWS CodeCommit", user.Name)
+	result, err := svc.ListServiceSpecificCredentials(&iam.ListServiceSpecificCredentialsInput{
+		UserName: &user.Name,
+	})
+	log.Debugf("ListServiceSpecificCredentials User:%s  API: %s ",user.Name,result)
+	if err !=nil{
+		log.Errorf("ListServiceSpecificCredentials User: %s MSG: %s",user.Name,err)
+	}else{
+		user.GitCreds = make([]string, len(result.ServiceSpecificCredentials))
+		for i,k := range result.ServiceSpecificCredentials{
+			user.GitCreds[i] = *k.ServiceUserName
+			log.Infof("ListServiceSpecificCredentials User: %s CredsUserName: %s",user.Name,user.GitCreds[i])
+			if !dryrun{
+				results , err := svc.DeleteServiceSpecificCredential(&iam.DeleteServiceSpecificCredentialInput{
+					UserName: &user.Name,
+					ServiceSpecificCredentialId: k.ServiceSpecificCredentialId,
+
+				})
+				log.Debugf("DeleteServiceSpecificCredential User: %s API: %s",user.Name,results)
+				if err != nil {
+					log.Errorf("DeleteServiceSpecificCredential User:%s MSG: %s",user.Name,err)
+				}else{
+					log.Infof("DeleteServiceSpecificCredential User:%s CredsUserName: %s",user.Name,user.GitCreds[i])
+				}
+			}else{
+				log.Infof("(DRYRUN) DeleteServiceSpecificCredential User:%s  CredsUserName: %s (DRYRUN)",user.Name,user.GitCreds[i])
 			}
 		}
 	}

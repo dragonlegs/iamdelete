@@ -18,12 +18,14 @@ var ccommit bool
 
 
 func getUser(wg *sync.WaitGroup,username string,number int){
-	defer wg.Done()
+
 	var Username User
 	Username.Name = username
 	UserList[number] = &Username
 	log.Debugf("Gathering Details for User: %s", username)
+	defer wg.Done()
 	PopulateInformation(UserList[number])
+
 
 }
 
@@ -45,6 +47,7 @@ func CheckingThis(profileName string, userList []string ,runIt bool,codeCommit b
 	for i,user := range userList{
 		wg.Add(1)
 		go getUser(&wg,user,i)
+
 	}
 	wg.Wait()
 	log.Infof("Summary of Removal DRYRUN: %t",dryrun)

@@ -37,8 +37,8 @@ func helpmsg(){
 func main(){
 
 
-	accesskey := flag.String("accesskeyid","","Access Key ID")
-	secretkey := flag.String("secretaccesskey","","Secret Access Key")
+	//accesskey := flag.String("accesskeyid","","Access Key ID")
+	//secretkey := flag.String("secretaccesskey","","Secret Access Key")
 	profileName := flag.String("profile","","AWS Profile to Use")
 	dryrun := flag.Bool("dryrun",false,"Prints out Items to be deleted and does not delete them")
 	logLevel := flag.Bool("d",false,"\n    	Enable Debug Logging")
@@ -49,22 +49,21 @@ func main(){
 	log.Debug("Starting ClI")
 
 	//list := flag.Args()
-	userList := strings.Split(flag.Args()[0],",")
 	if len(flag.Args()) <= 0 {
 		helpmsg()
 	}
+	userList := strings.Split(flag.Args()[0],",")
+
 	//for i := range list{
 	//	log.Debugf("ARG: %d Value:%s ", i,flag.Arg(i))
 	//}
 
-	if (*accesskey != "" && *secretkey != ""){
-		log.Info("AccessKey and Secret Key Found Attempting To Verify")
-		//client.CheckingThis(*accesskey,*secretkey)
-	}
+	//if (*accesskey != "" && *secretkey != ""){
+	//	log.Info("AccessKey and Secret Key Found Attempting To Verify")
+	//	//client.CheckingThis(*accesskey,*secretkey)
+	//}
 
 	client.CheckingThis(*profileName,userList,*dryrun,*code)
-
-
 
 
 }

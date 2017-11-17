@@ -12,6 +12,7 @@ type User struct {
 	Password bool
 	MFA      [1]string
 	Policies []string
+	InLinePolicies []string
 	Groups   []string
 	CodeCommitSSH	 []string
 	GitCreds  []string
@@ -29,6 +30,7 @@ func PopulateInformation(username *User) {
 	mfa(username)
 	group(username)
 	policies(username)
+	inlinepolicies(username)
 	if ccommit{
 		codecommit(username)
 	}
@@ -42,16 +44,16 @@ func getUserInfo(user *User) bool{
 	results, err := svc.GetUser(&iam.GetUserInput{
 		UserName: &user.Name,
 	})
-	log.Debugf("User: %s API: %s",user.Name,results)
+	log.Debugf("GetUser User: %s API: %s",user.Name,results)
 	if err != nil {
 		if aerr, ok := err.(awserr.Error); ok {
 			if aerr.Code() == iam.ErrCodeNoSuchEntityException {
-				log.Infof("Unable to find User: %s",user.Name)
-				log.Debugf("User: %s, API:%s",user.Name,results)
+				log.Errorf("Unable to find User: %s",user.Name)
+				log.Debugf("GetUser User: %s API:%s",user.Name,results)
 				return false
 			}
 		}
-		log.Errorf("User: %s MSG:%s",user.Name,err)
+		log.Errorf("GetUser User: %s MSG:%s",user.Name,err)
 		return false
 	}else{
 
@@ -70,27 +72,27 @@ func accessKey(user *User) {
 		UserName: &user.Name,
 	})
 	if err != nil {
-		log.Errorf("User: %s MSG: %s", user.Name, err)
+		log.Errorf("User: %s ListAccessKeys MSG: %s", user.Name, err)
 	} else {
-		log.Debugf("Querying AccessKeys User %s: Result: %s", user.Name, results)
+		log.Debugf("User %s: ListAccessKeys API: %s", user.Name, results)
 		user.AccessID = make([]string, len(results.AccessKeyMetadata))
 		for i, k := range results.AccessKeyMetadata {
 			user.AccessID[i] = *k.AccessKeyId
-			log.Infof("Get User: %s AccessKeys: %s", user.Name, *k.AccessKeyId)
+			log.Infof("GetAccesskey User: %s AccessKeys: %s", user.Name, *k.AccessKeyId)
 			if !dryrun {
-				log.Infof("Removing User: %s, AccessKey: %s", user.Name, *k.AccessKeyId)
 				result, err := svc.DeleteAccessKey(&iam.DeleteAccessKeyInput{
 					AccessKeyId: k.AccessKeyId,
 					UserName:    &user.Name,
 				})
 				if err != nil {
-					log.Errorf("User: %s MSG: %s", user.Name, err)
+					log.Errorf("DeleteAccessKey User: %s  MSG: %s", user.Name, err)
 				} else {
-					log.Debugf("Removing User:%s , AccessKeyId: %s API Result: %s", user.Name, *k.AccessKeyId, result)
+					log.Infof("DeleteAccessKey User: %s AccessKeyId: %s",user.Name,user.AccessID[i])
+					log.Debugf("DeleteAccessKey User: %s , AccessKeyId: %s API Result: %s", user.Name, *k.AccessKeyId, result)
 				}
 
 			} else {
-				log.Infof("Removing User:%s, AccessKey: %s (DRYRUN)", user.Name, *k.AccessKeyId)
+				log.Infof("(DRYRUN) DeleteAccessKey User: %s AccessKeyId: %s (DRYRUN)",user.Name,user.AccessID[i])
 			}
 
 		}
@@ -99,31 +101,31 @@ func accessKey(user *User) {
 
 func certificate(user *User) {
 
-	results, err := svc.ListSigningCertificates(&iam.ListSigningCertificatesInput{
+	result, err := svc.ListSigningCertificates(&iam.ListSigningCertificatesInput{
 		UserName: &user.Name,
 	})
 	if err != nil {
-		log.Errorf("User: %s MSG: %s", user.Name, err)
+		log.Errorf("User: %s ListSigningCertificates MSG: %s", user.Name, err)
 	} else {
 		//log.Debugf("Querying Certificate User %s: Result: %s",user.Name,results)
-		user.Certs = make([]string, len(results.Certificates))
-		for i, k := range results.Certificates {
+		user.Certs = make([]string, len(result.Certificates))
+		for i, k := range result.Certificates {
 			user.Certs[i] = *k.CertificateId
-			log.Infof("Get User: %s Certificate: %s", user.Name, *k.CertificateId)
+			log.Infof("GetSigningCertificates User: %s Certificate: %s", user.Name, *k.CertificateId)
 			if !dryrun {
-				log.Infof("Removing User: %s, AccessKey: %s", user.Name, *k.CertificateId)
-				result, err := svc.DeleteSigningCertificate(&iam.DeleteSigningCertificateInput{
+
+				results, err := svc.DeleteSigningCertificate(&iam.DeleteSigningCertificateInput{
 					CertificateId: k.CertificateId,
 					UserName:      &user.Name,
 				})
 				if err != nil {
-					log.Errorf("User: %s MSG: %s", user.Name, err)
+					log.Errorf("DeleteSigningCertificate User: %s MSG: %s", user.Name, err)
 				} else {
-					log.Debugf("Removing User:%s , Certificate: %s API Result: %s", user.Name, *k.CertificateId, result)
+					log.Debugf("DeleteSigningCertificate User:%s , Certificate: %s API Result: %s", user.Name, *k.CertificateId, results)
 				}
 
 			} else {
-				log.Infof("Removing User:%s, Certificate: %s (DRYRUN)", user.Name, *k.CertificateId)
+				log.Infof("(DRYRUN) DeleteSigningCertificate User:%s, Certificate: %s (DRYRUN)", user.Name, *k.CertificateId)
 			}
 
 		}
@@ -133,37 +135,36 @@ func certificate(user *User) {
 
 func profile(user *User) {
 
-	results, err := svc.GetLoginProfile(&iam.GetLoginProfileInput{
+	result, err := svc.GetLoginProfile(&iam.GetLoginProfileInput{
 		UserName: &user.Name,
 	})
 	if err != nil {
 		if aerr, ok := err.(awserr.Error); ok {
 			if aerr.Code() == iam.ErrCodeNoSuchEntityException {
-
 				user.Password = false
-				log.Infof("User: %s ConsolePassword: %t", user.Name, user.Password)
+				log.Infof("GetLoginProfile User: %s ConsolePassword: %t", user.Name, user.Password)
 
 			} else {
-				log.Errorf("User: %s MSG: %s", user.Name, err)
+				log.Errorf("GetLoginProfile User: %s MSG: %s", user.Name, err)
 
 			}
 			return
 		}
 
 	}
-	log.Debugf("Querying Login Profile User %s: Result: %s", user.Name, results)
-	log.Infof("User %s ConsolePassword: %t", user.Name, user.Password)
+	log.Debugf("GetLoginProfile User %s: API: %s", user.Name, result)
+	log.Infof("GetLoginProfile User: %s ConsolePassword: %t", user.Name, user.Password)
 	if !dryrun {
-		result, err := svc.DeleteLoginProfile(&iam.DeleteLoginProfileInput{
+		results, err := svc.DeleteLoginProfile(&iam.DeleteLoginProfileInput{
 			UserName: &user.Name,
 		})
 		if err != nil {
-			log.Errorf("User: %s MSG: %s", user.Name, err)
+			log.Errorf("DeleteLoginProfile User: %s MSG: %s", user.Name, err)
 		} else {
-			log.Debugf("Removing User:%s , ConsolePassword: %b API Result: %s", user.Name, user.Password, result)
+			log.Debugf("DeleteLoginProfile User:%s , ConsolePassword: %t API Result: %s", user.Name, user.Password, results)
 		}
 	} else {
-		log.Infof("Removing User:%s, ConsolePassword: %t (DRYRUN)", user.Name, user.Password)
+		log.Infof("(DRYRUN) DeleteLoginProfile User:%s, ConsolePassword: %t (DRYRUN)", user.Name, user.Password)
 	}
 
 }
@@ -174,30 +175,30 @@ func mfa(user *User) {
 		UserName: &user.Name,
 	})
 	if err != nil {
-		log.Error("User %s : MSG: %s", user.Name, err)
+		log.Error("ListMFADevices User %s : MSG: %s", user.Name, err)
 	} else {
-		log.Debugf("Querying MFA User %s: Result: %s", user.Name, result)
+		log.Debugf("ListMFADevices User %s: API: %s", user.Name, result)
 		if result.MFADevices != nil {
 			user.MFA[0] = *result.MFADevices[0].SerialNumber
 			if !dryrun {
-				result, err := svc.DeactivateMFADevice(&iam.DeactivateMFADeviceInput{
+				results, err := svc.DeactivateMFADevice(&iam.DeactivateMFADeviceInput{
 					UserName:     &user.Name,
 					SerialNumber: &user.MFA[0],
 				})
 				if err != nil {
-					log.Errorf("User: %s MSG: %s", user.Name, err)
+					log.Errorf("DeactivateMFADevice User: %s MSG: %s", user.Name, err)
 				} else {
-					log.Debugf("Removing User %s MFA: %s API: %s", user.Name, user.MFA, result)
-					log.Infof("Removing User: %s MFA: %s", user.Name, user.MFA)
+					log.Debugf("DeactivateMFADevice User %s MFA: %s API: %s", user.Name, user.MFA, results)
+					log.Infof("DeactivateMFADevice User: %s MFA: %s", user.Name, user.MFA)
 
 				}
 
 			} else {
-				log.Debugf("Removing User:%s , MFA: %s (DRYRUN)", user.Name, user.MFA)
+				log.Debugf("(DRYRUN) DeactivateMFADevice User:%s , MFA: %s (DRYRUN)", user.Name, user.MFA)
 			}
 		} else {
 			user.MFA[0] = "None"
-			log.Infof("User: %s MFA: %s", user.Name, user.MFA)
+			log.Infof("MFADeviceNotFound User: %s MFA: %s", user.Name, user.MFA)
 		}
 
 	}
@@ -210,75 +211,107 @@ func policies(user *User) {
 		UserName: &user.Name,
 	})
 	if err != nil {
-		log.Errorf("User: %s MSG: %s", user.Name, err)
+		log.Errorf("ListAttachedUserPolicies User: %s MSG: %s", user.Name, err)
 	} else {
-		log.Debugf("User: %s Policies: %s API: %+v", user.Name, result.AttachedPolicies, result)
+		log.Debugf("ListAttachedUserPolicies User: %s API: %+v", user.Name, result.AttachedPolicies, result)
 		user.Policies = make([]string, len(result.AttachedPolicies))
 		for i, k := range result.AttachedPolicies {
 			user.Policies[i] = *k.PolicyArn
 			if !dryrun {
-				result, err := svc.DetachUserPolicy(&iam.DetachUserPolicyInput{
+				results, err := svc.DetachUserPolicy(&iam.DetachUserPolicyInput{
 					UserName:  &user.Name,
 					PolicyArn: &user.Policies[i],
 				})
-				log.Debugf("User: %s API: %s", user.Name, result)
+				log.Debugf("DetachUserPolicy User: %s API: %s", user.Name, results)
 				if err != nil {
-					log.Errorf("User: %s Policy: %s MSG: %s ", user.Name, user.Policies[i], err)
+					log.Errorf("DetachUserPolicy User: %s Policy: %s MSG: %s ", user.Name, user.Policies[i], err)
 				} else {
-					log.Infof("Detach User: %s Policy: %s", user.Name, user.Policies[i])
+					log.Infof("DetachUserPolicy User: %s Policy: %s", user.Name, user.Policies[i])
 				}
 			} else {
-				log.Infof("Detach User: %s Policy: %s (DRYRUN)", user.Name, user.Policies[i])
+				log.Infof("(DRYRUN) DetachUserPolicy User: %s Policy: %s (DRYRUN)", user.Name, user.Policies[i])
 			}
 		}
 
-		log.Debugf("User: %s Policies: %s", user.Name, user.Policies)
+
+	}
+
+}
+
+func inlinepolicies(user *User) {
+
+	result, err := svc.ListUserPolicies(&iam.ListUserPoliciesInput{
+		UserName: &user.Name,
+	})
+	if err != nil {
+		log.Errorf("ListUserPolicies User: %s MSG: %s", user.Name, err)
+	} else {
+		log.Debugf("ListUserPolicies User: %s API: %+v", user.Name, result.PolicyNames, result)
+		user.InLinePolicies = make([]string, len(result.PolicyNames))
+		for i, k := range result.PolicyNames {
+			user.InLinePolicies[i] = *k
+			if !dryrun {
+				results, err := svc.DeleteUserPolicy(&iam.DeleteUserPolicyInput{
+					UserName:  &user.Name,
+					PolicyName: &user.InLinePolicies[i],
+				})
+				log.Debugf("DeleteUserPolicy User: %s API: %s", user.Name, results)
+				if err != nil {
+					log.Errorf("DeleteUserPolicy User: %s Policy: %s MSG: %s ", user.Name, user.InLinePolicies[i], err)
+				} else {
+					log.Infof("DeleteUserPolicy Detach User: %s Policy: %s", user.Name, user.InLinePolicies[i])
+				}
+			} else {
+				log.Infof("(DRYRUN) DeleteUserPolicy User: %s Policy: %s (DRYRUN)", user.Name, user.InLinePolicies[i])
+			}
+		}
+
 
 	}
 
 }
 
 func group(user *User) {
-	log.Infof("Querying Groups Attached to User: %s", user.Name)
 	result, err := svc.ListGroupsForUser(&iam.ListGroupsForUserInput{
 		UserName: &user.Name,
 	})
 	if err != nil {
-		log.Errorf("User: %s MSG: %s", user.Name, err)
+		log.Errorf("ListGroupsForUser User: %s MSG: %s", user.Name, err)
 	} else {
-		log.Debugf("User: %s API: %s", user.Name, result)
+		log.Debugf("ListGroupsForUser User: %s API: %s", user.Name, result)
 		user.Groups = make([]string, len(result.Groups))
 		for i, k := range result.Groups {
 			user.Groups[i] = *k.GroupName
+			log.Infof("ListGroupsForUser User: %s Group: %s",user.Name,user.Groups[i])
 			if !dryrun {
-				result, err := svc.RemoveUserFromGroup(&iam.RemoveUserFromGroupInput{
+				results, err := svc.RemoveUserFromGroup(&iam.RemoveUserFromGroupInput{
 					UserName:  &user.Name,
 					GroupName: &user.Groups[i],
 				})
 				if err != nil {
-					log.Errorf("User: %s MSG: %s", user.Name, err)
+					log.Errorf("RemoveUserFromGroup User: %s MSG: %s", user.Name, err)
 				} else {
-					log.Debugf("Use:%s API:%s", user.Name, result)
-					log.Infof("Removing User:%s from Group: %s", user.Name, k)
+					log.Debugf("RemoveUserFromGroup Use:%s API:%s", user.Name, results)
+					log.Infof("RemoveUserFromGroup User:%s Group: %s", user.Name, k.GroupName)
 
 				}
 			}else{
-				log.Infof("User: %s Removing from Group %s",user.Name,k)
+				log.Infof("(DRYRUN) RemoveUserFromGroup User: %s Removing from Group %s (DRYRUN)",user.Name,user.Groups[i])
 		}
 	}
 }}
 
 func removeUser(user *User) {
 
-	log.Infof("Attempting to Remove User: %s",user.Name)
+	//log.Infof("Attempting to Remove User: %s",user.Name)
 	result,err := svc.DeleteUser(&iam.DeleteUserInput{
 		UserName:&user.Name,
 	})
-	log.Debugf("User:%s API: %s",user.Name,result)
+	log.Debugf("DeleteUser User:%s API: %s",user.Name,result)
 	if err != nil{
-		log.Debugf("User: %s MSG: %s",user.Name,err)
+		log.Errorf("DeleteUser User: %s MSG: %s",user.Name,err)
 	}else{
-		log.Infof("Removed User: %s",user.Name)
+		log.Infof("DeleteUser User: %s ",user.Name)
 	}
 
 }
